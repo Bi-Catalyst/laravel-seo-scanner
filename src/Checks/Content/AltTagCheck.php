@@ -29,7 +29,7 @@ class AltTagCheck implements Check
 
     public function check(Response $response, Crawler $crawler): bool
     {
-        if (! $this->validateContent($crawler)) {
+        if (!$this->validateContent($crawler)) {
             return false;
         }
 
@@ -68,7 +68,8 @@ class AltTagCheck implements Check
     {
         $src = $node->attr('src');
 
-        if (! $src) {
+
+        if (!$src || !$this->isImageUrl($src)) {
             return null;
         }
 
@@ -86,7 +87,10 @@ class AltTagCheck implements Check
 
         return $src;
     }
-
+    private function isImageUrl(string $url): bool
+    {
+        return preg_match('/\.(jpeg|jpg|gif|png|bmp|tiff|webp|ico)$/i', $url);
+    }
     private function getImageDimensions(string $src, Crawler $node): array
     {
         if (app()->runningUnitTests()) {
@@ -96,11 +100,23 @@ class AltTagCheck implements Check
             ];
         }
 
-        $dimensions = getimagesize($src);
+        try {
+            $dimensions = @getimagesize($src);
+            if ($dimensions === false) {
+                throw new \Exception("Unable to get image dimensions for: " . $src);
+            }
 
-        return [
-            'width' => $dimensions[0],
-            'height' => $dimensions[1],
-        ];
+            return [
+                'width' => $dimensions[0],
+                'height' => $dimensions[1],
+            ];
+        } catch (\Exception $e) {
+            // Log the error or handle it as required
+            error_log($e->getMessage());
+            return [
+                'width' => 0,
+                'height' => 0,
+            ];
+        }
     }
 }
