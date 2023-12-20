@@ -30,49 +30,47 @@ class KeywordInTitleCheck implements Check
 
     public function check(Response $response, Crawler $crawler): bool
     {
-        if (! $this->validateContent($crawler)) {
-            $this->failureReason = __('failed.meta.keyword_in_title_check');
-
+        $validationResult = $this->validateContent($crawler);
+    
+        if ($validationResult['valid'] === false) {
+            $this->failureReason = __('failed.meta.keyword_in_title_check') 
+                                    . " Title: " . $validationResult['title'] 
+                                    . ", Keywords: " . $validationResult['keywords'];
+    
             return false;
         }
-
+    
         return true;
     }
+    
 
-    public function validateContent(Crawler $crawler): bool
+    public function validateContent(Crawler $crawler): array
     {
         $keywords = $this->getKeywords($crawler);
-
-        if (! $keywords) {
-            return false;
-        }
-
-        $this->expectedValue = $keywords;
-
         $title = $crawler->filterXPath('//title')->text();
 
-        if (! $title) {
-            return false;
+        if (!$keywords || !$title || !Str::contains($title, $keywords)) {
+            return [
+                'valid' => false,
+                'title' => $title ?? 'No title found',
+                'keywords' => $keywords ?? 'No keywords found'
+            ];
         }
 
-        if (! Str::contains($title, $keywords)) {
-            return false;
-        }
-
-        return true;
+        return ['valid' => true];
     }
 
     public function getKeywords(Crawler $crawler): array
     {
         $node = $crawler->filterXPath('//meta[@name="keywords"]')->getNode(0);
 
-        if (! $node) {
+        if (!$node) {
             return [];
         }
 
         $keywords = $crawler->filterXPath('//meta[@name="keywords"]')->attr('content');
 
-        if (! $keywords) {
+        if (!$keywords) {
             return [];
         }
 
