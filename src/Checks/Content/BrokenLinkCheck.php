@@ -6,12 +6,16 @@ use Illuminate\Http\Client\Response;
 use Symfony\Component\DomCrawler\Crawler;
 use Vormkracht10\Seo\Interfaces\Check;
 use Vormkracht10\Seo\Traits\PerformCheck;
+use Vormkracht10\Seo\Traits\Translatable;
 
 class BrokenLinkCheck implements Check
 {
-    use PerformCheck;
+    use PerformCheck,
+        Translatable;
 
     public string $title = 'The page contains no broken links';
+
+    public string $description = 'The page should not contain any broken links because it is bad for the user experience.';
 
     public string $priority = 'medium';
 
@@ -49,15 +53,7 @@ class BrokenLinkCheck implements Check
         $content = collect($content)->filter(fn ($value) => $value !== null)
             ->map(fn ($link) => addBaseIfRelativeUrl($link, $this->url))
             ->filter(function ($link) {
-                // Filter out all links that are mailto or tel
-                if (preg_match('/^mailto:/msi', $link) ||
-                    preg_match('/^tel:/msi', $link) ||
-                    filter_var($link, FILTER_VALIDATE_URL) === false
-                ) {
-                    return false;
-                }
-
-                return $link;
+                return $this->isValidLink($link) && ! $this->isExcludedLink($link);
             })
             ->filter(function ($link) {
                 return isBrokenLink($link) ? $link : false;
@@ -84,5 +80,39 @@ class BrokenLinkCheck implements Check
         }
 
         return true;
+    }
+
+    private function isValidLink($link): bool
+    {
+        return ! preg_match('/^mailto:/msi', $link) &&
+               ! preg_match('/^tel:/msi', $link) &&
+               filter_var($link, FILTER_VALIDATE_URL) !== false;
+    }
+
+    private function isExcludedLink($link): bool
+    {
+        $excludedPaths = config('seo.broken_link_check.exclude_links');
+        if (empty($excludedPaths)) {
+            return false;
+        }
+
+        foreach ($excludedPaths as $path) {
+            if ($this->linkMatchesPath($link, $path)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function linkMatchesPath($link, $path): bool
+    {
+        if (str_contains($path, '*')) {
+            $path = str_replace('/*', '', $path);
+
+            return str_starts_with($link, $path);
+        }
+
+        return str_contains($link, $path);
     }
 }

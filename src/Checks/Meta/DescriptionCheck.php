@@ -6,12 +6,16 @@ use Illuminate\Http\Client\Response;
 use Symfony\Component\DomCrawler\Crawler;
 use Vormkracht10\Seo\Interfaces\Check;
 use Vormkracht10\Seo\Traits\PerformCheck;
+use Vormkracht10\Seo\Traits\Translatable;
 
 class DescriptionCheck implements Check
 {
-    use PerformCheck;
+    use PerformCheck,
+        Translatable;
 
     public string $title = 'The page has a meta description';
+
+    public string $description = 'The meta description is used by search engines to show a description of the page in the search results.';
 
     public string $priority = 'medium';
 
@@ -38,20 +42,27 @@ class DescriptionCheck implements Check
         return true;
     }
 
-    public function validateContent(Crawler $crawler): bool
+    public function getDescriptionContent(Crawler $crawler): ?string
     {
+        /** @var \DOMElement $node */
         $node = $crawler->filterXPath('//meta[@name="description"]')->getNode(0);
 
-        if (! $node) {
-            return false;
+        if ($node instanceof \DOMElement && $node->hasAttribute('content')) {
+            return $node->getAttribute('content');
         }
 
-        $content = $crawler->filterXPath('//meta[@name="description"]')->attr('content');
+        return null;
+    }
 
-        if (! $content) {
-            return false;
-        }
+    public function validateContent(Crawler $crawler): bool
+    {
+        $content = $this->getDescriptionContent($crawler);
 
-        return true;
+        return ! empty($content);
+    }
+
+    public function isDescriptionSet(Crawler $crawler): bool
+    {
+        return $this->getDescriptionContent($crawler) !== null;
     }
 }
